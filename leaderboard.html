@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>강의왕 랭킹</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#12162a;
+    --bg-grid:#171d38;
+    --card:#1d2440;
+    --card-border:#323d63;
+    --gold:#ffd166;
+    --silver:#d7dee6;
+    --bronze:#e0925a;
+    --teal:#4ecdc4;
+    --text:#eef1f8;
+    --muted:#8a93b8;
+    --danger:#ff6b6b;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    min-height:100vh;
+    background:
+      linear-gradient(var(--bg-grid) 1px, transparent 1px) 0 0/100% 28px,
+      linear-gradient(90deg, var(--bg-grid) 1px, transparent 1px) 0 0/28px 100%,
+      var(--bg);
+    color:var(--text);
+    font-family:'Noto Sans KR', sans-serif;
+    padding:32px 16px 64px;
+  }
+  .wrap{max-width:720px; margin:0 auto;}
+
+  /* header */
+  .header{
+    text-align:center;
+    margin-bottom:28px;
+  }
+  .eyebrow{
+    font-family:'Press Start 2P', monospace;
+    font-size:9px;
+    letter-spacing:2px;
+    color:var(--teal);
+    display:inline-flex;
+    align-items:center;
+    gap:8px;
+    margin-bottom:14px;
+  }
+  .eyebrow .dot{
+    width:6px;height:6px;border-radius:50%;
+    background:var(--teal);
+    box-shadow:0 0 8px var(--teal);
+    animation:blink 1.4s infinite;
+  }
+  @keyframes blink{0%,100%{opacity:1;}50%{opacity:.25;}}
+  .title{
+    font-family:'Press Start 2P', monospace;
+    font-size:22px;
+    line-height:1.6;
+    color:var(--gold);
+    text-shadow:0 0 18px rgba(255,209,102,.35), 3px 3px 0 #4a3305;
+    margin:0;
+  }
+  .sub{
+    color:var(--muted);
+    font-size:13px;
+    margin-top:12px;
+  }
+
+  /* podium */
+  .podium{
+    display:grid;
+    grid-template-columns:1fr 1.15fr 1fr;
+    align-items:end;
+    gap:10px;
+    margin-bottom:28px;
+  }
+  .podium-card{
+    background:var(--card);
+    border:1px solid var(--card-border);
+    border-radius:10px;
+    padding:16px 8px 14px;
+    text-align:center;
+    position:relative;
+  }
+  .podium-card.rank-1{
+    order:2;
+    padding-top:24px;
+    border-color:var(--gold);
+    box-shadow:0 0 0 1px var(--gold), 0 0 28px rgba(255,209,102,.25);
+    animation:pulse-gold 2.4s ease-in-out infinite;
+  }
+  .podium-card.rank-2{order:1;}
+  .podium-card.rank-3{order:3;}
+  @keyframes pulse-gold{
+    0%,100%{box-shadow:0 0 0 1px var(--gold), 0 0 20px rgba(255,209,102,.2);}
+    50%{box-shadow:0 0 0 1px var(--gold), 0 0 34px rgba(255,209,102,.4);}
+  }
+  .medal{font-size:26px; display:block; margin-bottom:6px;}
+  .podium-rank{
+    font-family:'Press Start 2P', monospace;
+    font-size:10px;
+    color:var(--muted);
+    margin-bottom:8px;
+  }
+  .rank-1 .podium-rank{color:var(--gold);}
+  .rank-2 .podium-rank{color:var(--silver);}
+  .rank-3 .podium-rank{color:var(--bronze);}
+  .podium-name{
+    font-weight:700;
+    font-size:14px;
+    margin-bottom:6px;
+    word-break:keep-all;
+  }
+  .podium-score{
+    font-family:'Press Start 2P', monospace;
+    font-size:15px;
+    color:var(--text);
+  }
+  .podium-score .unit{font-size:9px; color:var(--muted); margin-left:2px;}
+
+  /* list */
+  .list{
+    background:var(--card);
+    border:1px solid var(--card-border);
+    border-radius:10px;
+    overflow:hidden;
+  }
+  .row{
+    display:grid;
+    grid-template-columns:36px 1fr auto;
+    align-items:center;
+    gap:12px;
+    padding:12px 16px;
+    border-bottom:1px solid var(--card-border);
+    transition:background .5s ease;
+  }
+  .row:last-child{border-bottom:none;}
+  .row.flash{background:rgba(78,205,196,.14);}
+  .row-rank{
+    font-family:'Press Start 2P', monospace;
+    font-size:11px;
+    color:var(--muted);
+    text-align:center;
+  }
+  .row-main{min-width:0;}
+  .row-name{font-weight:500; font-size:14px;}
+  .row-bar-track{
+    height:5px; border-radius:3px; background:#141a33; margin-top:6px; overflow:hidden;
+  }
+  .row-bar-fill{
+    height:100%; background:linear-gradient(90deg, var(--teal), #6bd9d0);
+    border-radius:3px; transition:width .6s ease;
+  }
+  .row-score{
+    font-family:'Press Start 2P', monospace;
+    font-size:13px;
+    color:var(--text);
+    white-space:nowrap;
+  }
+
+  .state{
+    text-align:center;
+    color:var(--muted);
+    font-size:13px;
+    padding:32px 0;
+  }
+  .state.error{color:var(--danger);}
+
+  .footer-note{
+    text-align:center;
+    color:var(--muted);
+    font-size:11px;
+    margin-top:16px;
+  }
+
+  @media (max-width:480px){
+    .title{font-size:16px;}
+    .podium-card.rank-1{padding-top:18px;}
+    .medal{font-size:20px;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="header">
+    <div class="eyebrow"><span class="dot"></span>LIVE RANKING</div>
+    <h1 class="title">강의왕 랭킹</h1>
+    <p class="sub" id="lastUpdated">불러오는 중...</p>
+  </div>
+
+  <div id="podium" class="podium" style="display:none;"></div>
+  <div id="list" class="list"></div>
+  <div id="stateBox" class="state">데이터를 불러오는 중이에요...</div>
+
+  <p class="footer-note">30~60초마다 자동으로 갱신됩니다</p>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script>
+/* ============ 설정: 이 부분만 바꿔서 사용하세요 ============ */
+const CONFIG = {
+  // 구글시트 웹게시 CSV 링크 (반드시 ...output=csv 로 끝나는 형식이어야 함)
+  // pubhtml 링크는 동작하지 않음 — 게시 시 형식을 CSV로 다시 선택해서 발급받을 것
+  CSV_URL: "https://docs.google.com/spreadsheets/d/e/2PACX-1vTewHShv-WUhVxxuNklQUmbiNLoIUCdz9wXr5GZ6nL4dugrVkKb_jLW_Zi9FyOaKmu4Irrmnj5-OLuR/pub?output=csv",
+
+  // 시트에서 실제로 보이는 열 문자를 그대로 적으면 됨 (헤더 텍스트 몰라도 OK)
+  COLUMNS: {
+    UNIQUE_KEY: "E",  // 전화번호 뒷자리 — 동일인 판별 고유값 기준
+    NAME: "D",        // 이름 표시용 열
+    COMPANY: "G",     // 기업명 열 (Apps Script가 매칭해서 채워주는 열)
+    SCORE: "H",       // 점수 열 (Apps Script가 계산해서 채워주는 열)
+  },
+
+  // 1행이 헤더(컬럼명)이면 true, 데이터가 1행부터 바로 시작하면 false
+  HAS_HEADER_ROW: true,
+
+  // 폴링 주기 (ms) — 30~60초 권장
+  POLL_INTERVAL_MS: 45000,
+};
+/* ============================================================ */
+
+let prevScores = {}; // 이전 점수 기억 → 변동 시 하이라이트용
+
+// 'A' -> 0, 'B' -> 1, 'AA' -> 26 ... 스프레드시트 열 문자를 배열 인덱스로 변환
+function letterToIndex(letter) {
+  let idx = 0;
+  for (let i = 0; i < letter.length; i++) {
+    idx = idx * 26 + (letter.toUpperCase().charCodeAt(i) - 64);
+  }
+  return idx - 1;
+}
+
+// 이름 가운데 글자를 마스킹 (예: 김선경 -> 김O경, 이지 -> 이O)
+function maskName(name) {
+  if (!name) return name;
+  const chars = Array.from(name);
+  if (chars.length <= 1) return name;
+  if (chars.length === 2) return chars[0] + "O";
+  return chars[0] + "O".repeat(chars.length - 2) + chars[chars.length - 1];
+}
+
+function normalizeRows(rawRows) {
+  const rows = CONFIG.HAS_HEADER_ROW ? rawRows.slice(1) : rawRows;
+  const keyIdx = letterToIndex(CONFIG.COLUMNS.UNIQUE_KEY);
+  const nameIdx = letterToIndex(CONFIG.COLUMNS.NAME);
+  const companyIdx = letterToIndex(CONFIG.COLUMNS.COMPANY);
+  const scoreIdx = letterToIndex(CONFIG.COLUMNS.SCORE);
+
+  // 고유키(전화번호 뒷자리) 기준으로 합산, 표시 이름/기업명은 가장 최근 값 사용
+  const totals = {}; // key -> { key, name, company, score }
+  rows.forEach(r => {
+    if (!r || r.length === 0) return;
+    const key = (r[keyIdx] || "").toString().trim();
+    const name = (r[nameIdx] || "").toString().trim();
+    const company = (r[companyIdx] || "").toString().trim();
+    const score = parseFloat(r[scoreIdx]);
+    if (!key || isNaN(score)) return;
+    if (!totals[key]) totals[key] = { key, name: name || key, company: "", score: 0 };
+    totals[key].score += score;
+    if (name) totals[key].name = name; // 이름 표기가 있으면 최신 값으로 갱신
+    if (company) totals[key].company = company; // 기업명도 최신 값으로 갱신
+  });
+
+  return Object.values(totals).sort((a, b) => b.score - a.score);
+}
+
+function medal(rank) {
+  return rank === 1 ? "🥇" : rank === 2 ? "🥈" : "🥈".replace("🥈", "🥉");
+}
+
+function render(ranking) {
+  const stateBox = document.getElementById("stateBox");
+  const podiumEl = document.getElementById("podium");
+  const listEl = document.getElementById("list");
+
+  if (!ranking.length) {
+    stateBox.style.display = "block";
+    stateBox.textContent = "아직 제출된 응답이 없어요.";
+    podiumEl.style.display = "none";
+    listEl.innerHTML = "";
+    return;
+  }
+  stateBox.style.display = "none";
+
+  const top3 = ranking.slice(0, 3);
+  const rest = ranking.slice(3);
+  const maxScore = ranking[0].score || 1;
+
+  // 포디움
+  podiumEl.style.display = "grid";
+  podiumEl.innerHTML = top3.map((p, i) => {
+    const rank = i + 1;
+    const medalIcon = rank === 1 ? "🥇" : rank === 2 ? "🥈" : "🥉";
+    const displayName = escapeHtml(maskName(p.name)) +
+      (p.company ? ` - ${escapeHtml(p.company)}` : "");
+    return `
+      <div class="podium-card rank-${rank}">
+        <span class="medal">${medalIcon}</span>
+        <div class="podium-rank">RANK ${rank}</div>
+        <div class="podium-name">${displayName}</div>
+        <div class="podium-score">${p.score}<span class="unit">P</span></div>
+      </div>`;
+  }).join("");
+
+  // 리스트 (4위 이하)
+  listEl.innerHTML = rest.map((p, i) => {
+    const rank = i + 4;
+    const changed = prevScores[p.key] !== undefined && prevScores[p.key] !== p.score;
+    const widthPct = Math.max(4, Math.round((p.score / maxScore) * 100));
+    const displayName = escapeHtml(maskName(p.name)) +
+      (p.company ? ` - ${escapeHtml(p.company)}` : "");
+    return `
+      <div class="row ${changed ? "flash" : ""}">
+        <div class="row-rank">${rank}</div>
+        <div class="row-main">
+          <div class="row-name">${displayName}</div>
+          <div class="row-bar-track"><div class="row-bar-fill" style="width:${widthPct}%"></div></div>
+        </div>
+        <div class="row-score">${p.score}P</div>
+      </div>`;
+  }).join("");
+
+  // 다음 비교를 위해 저장
+  const newPrev = {};
+  ranking.forEach(p => newPrev[p.key] = p.score);
+  prevScores = newPrev;
+}
+
+function updateTimestamp() {
+  const now = new Date();
+  document.getElementById("lastUpdated").textContent =
+    "마지막 갱신: " + now.toLocaleTimeString("ko-KR", { hour12: false });
+}
+
+function fetchAndRender() {
+  fetch(CONFIG.CSV_URL, { cache: "no-store" })
+    .then(res => {
+      if (!res.ok) throw new Error("네트워크 오류: " + res.status);
+      return res.text();
+    })
+    .then(csvText => {
+      const parsed = Papa.parse(csvText, { header: false, skipEmptyLines: true });
+      const ranking = normalizeRows(parsed.data);
+      render(ranking);
+      updateTimestamp();
+    })
+    .catch(err => {
+      const stateBox = document.getElementById("stateBox");
+      stateBox.style.display = "block";
+      stateBox.className = "state error";
+      stateBox.textContent = "데이터를 불러오지 못했어요. CSV_URL 설정을 확인해주세요.";
+      console.error(err);
+    });
+}
+
+fetchAndRender();
+setInterval(fetchAndRender, CONFIG.POLL_INTERVAL_MS);
+
+function escapeHtml(str) {
+  return str.replace(/[&<>"']/g, s => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+  }[s]));
+}
+</script>
+</body>
+</html>
