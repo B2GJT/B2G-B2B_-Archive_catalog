@@ -645,7 +645,7 @@ const LINES = [
 /* ============ 설정: 배포 후 이 값만 바꾸면 됩니다 ============ */
 const API_CONFIG = {
   // Apps Script 웹앱 배포 후 나오는 URL로 교체하세요 (…/exec 로 끝나는 링크)
-  API_URL: "여기에_Apps_Script_웹앱_URL을_붙여넣으세요",
+  API_URL: "https://script.google.com/macros/s/AKfycbygFueKlng5DMdNMb1sn3pGjzXmpHPH8bTfCiDBXCnZX1cE5Fakr0y9s5HOVu4LnyZqRA/exec",
 };
 /* ================================================================ */
 
@@ -873,7 +873,7 @@ async function startBoard(category) {
     render(false);
   } catch (err) {
     console.error(err);
-    els.selectError.textContent = '데이터를 불러오지 못했어요. API_URL 설정을 확인해주세요.';
+    els.selectError.textContent = `데이터를 불러오지 못했어요: ${err.message || err}`;
     els.selectError.style.display = 'block';
   } finally {
     els.startBtn.disabled = false;
