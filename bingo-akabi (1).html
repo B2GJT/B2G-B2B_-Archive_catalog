@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>아카비와 함께하는 빙고게임</title>
+<title> 2빙고를 만들어라! 데이원아카이브 빙고게임</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Noto+Sans+KR:wght@500;700;900&display=swap" rel="stylesheet">
 <style>
@@ -319,7 +319,6 @@
 <div class="bingo-popup-overlay" id="bingoPopup">
   <div class="bingo-popup-card">
     <p class="bingo-popup-title" id="bingoPopupTitle">1빙고!</p>
-    <p class="bingo-popup-sub">보리와 나비가 신났어요</p>
   </div>
 </div>
 
@@ -329,8 +328,8 @@
     <ol class="howto-list">
       <li><span class="step-num">1</span>내 빙고판을 뽑아주세요</li>
       <li><span class="step-num">2</span>빙고판에 있는 강의를 수강해주세요</li>
-      <li><span class="step-num">3</span>해당 강의를 3시간 이상 수강했다면 빙고판을 눌러주세요</li>
-      <li><span class="step-num">4</span>빙고 2줄을 만들면 캡쳐 후 인증해주세요</li>
+      <li><span class="step-num">3</span>해당 강의를 3시간 이상 수강했다면, 해당 네모칸을 눌러주세요</li>
+      <li><span class="step-num">4</span>빙고 2줄을 만들면 캡쳐 후 게사판을 통해 인증해주세요</li>
     </ol>
     <button class="btn-cute" id="closeHowTo" style="width:100%;">확인!</button>
   </div>
@@ -881,7 +880,6 @@ async function startBoard(category) {
   }
 }
 
-// 보리 & 나비 캐릭터를 SVG로 그려서 삽입 (완전히 부화한 상태)
 function renderPixelDog() {
   if (!els.pixelDog) return;
   els.pixelDog.innerHTML = `
