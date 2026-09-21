@@ -1,165 +1,778 @@
-/* ============================================================
-   빙고 게임 백엔드 API (Apps Script Web App)
-   - 새 구글시트를 하나 만들고, 그 시트의 스크립트 편집기에
-     이 코드를 통째로 붙여넣으세요.
-   - 이 시트는 다른 시트와 완전히 별개로, 빙고 전용 데이터만 저장합니다.
-   ============================================================ */
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>아카비와 함께하는 빙고게임</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Noto+Sans+KR:wght@500;700;900&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --sky1:#5c94fc;
+    --sky2:#8fc1ff;
+    --ink:#20223a;
+    --muted:#5c5f7a;
+    --card:#ffffff;
+    --accent1:#5b6bff;
+    --accent2:#22c9a3;
+    --accent3:#ff6f8f;
+    --gold:#fbd000;
+    --brick:#c84c0e;
+    --mario-red:#e52521;
+  }
+  *{box-sizing:border-box;}
+  html,body{overflow-x:hidden;}
+  body{
+    margin:0;
+    min-height:100vh;
+    background:
+      radial-gradient(circle 26px at 15% 12%, #fff 98%, transparent 100%),
+      radial-gradient(circle 20px at 22% 10%, #fff 98%, transparent 100%),
+      radial-gradient(circle 22px at 82% 20%, #fff 98%, transparent 100%),
+      radial-gradient(circle 16px at 90% 24%, #fff 98%, transparent 100%),
+      linear-gradient(180deg, var(--sky1), var(--sky2) 70%);
+    color:var(--ink);
+    font-family:'Noto Sans KR', sans-serif;
+    padding:32px 16px 100px;
+  }
+  .wrap{max-width:600px; margin:0 auto;}
 
-const CONFIG = {
-  DATA_SHEET_NAME: '빙고데이터',
+  .header{text-align:center; margin-bottom:6px;}
+  .title{
+    font-family:'Press Start 2P', monospace; font-size:20px; line-height:1.7; color:var(--gold); margin:0;
+    text-shadow:
+      2px 0 0 #a83200, -2px 0 0 #a83200, 0 2px 0 #a83200, 0 -2px 0 #a83200,
+      2px 2px 0 #a83200, 3px 4px 0 rgba(0,0,0,.25);
+  }
+  .how-to-btn{
+    margin-top:10px; font-family:'Noto Sans KR', sans-serif; font-weight:700; font-size:12.5px;
+    color:#fff; background:rgba(0,0,0,.28); border:2px solid rgba(255,255,255,.6);
+    padding:7px 14px; border-radius:999px; cursor:pointer;
+  }
+  .how-to-btn:hover{ background:rgba(0,0,0,.42); }
 
-  // 강의 목록이 들어있는 "미수강 컨텐츠" 구글시트
-  COURSE_LIST_SPREADSHEET_ID: '1rXG8d71mkOWKI1ChWH5WtinfRcOz1e-AhDD8HfVacfA',
-  COURSE_LIST_SHEET_NAME: '시트1',
-  // 실제 시트 열 위치: A=ID, B=과정명, C=카테고리(원본, 미사용), D=상태, E=수강장 링크, H=대분류, I=중분류
-  COURSE_LIST_COLUMNS: { TITLE: 'B', STATUS: 'D', URL: 'E', MAJOR_CATEGORY: 'H' },
-  COURSE_LIST_ACTIVE_VALUE: '활성', // 이 값이 아닌 행은 제외
+  .modal-overlay{
+    position:fixed; inset:0; background:rgba(10,10,35,.55);
+    display:flex; align-items:center; justify-content:center; padding:20px;
+    z-index:95; opacity:0; pointer-events:none; transition:opacity .2s ease;
+  }
+  .modal-overlay.show{ opacity:1; pointer-events:auto; }
+  .modal-card{
+    background:#fff; border:4px solid #2a2a2a; border-radius:16px;
+    padding:26px 24px; max-width:360px; width:100%;
+    box-shadow:0 10px 0 #1a1a1a;
+    transform:scale(.85); transition:transform .2s ease;
+  }
+  .modal-overlay.show .modal-card{ transform:scale(1); }
+  .modal-title{
+    font-family:'Press Start 2P', monospace; font-size:15px; color:var(--mario-red);
+    text-align:center; margin:0 0 18px;
+  }
+  .howto-list{ list-style:none; margin:0 0 20px; padding:0; }
+  .howto-list li{
+    display:flex; align-items:center; gap:10px;
+    font-size:14px; font-weight:700; color:var(--ink);
+    padding:9px 4px; border-bottom:2px dashed #eee;
+  }
+  .howto-list li:last-child{ border-bottom:none; }
+  .step-num{
+    flex-shrink:0; width:24px; height:24px; border-radius:50%;
+    background:var(--mario-red); color:#fff; font-size:12px; font-weight:900;
+    display:flex; align-items:center; justify-content:center;
+  }
 
-  // 강의 수가 적은 대분류는 성격이 비슷한 카테고리로 합쳐서 9칸을 항상 채울 수 있게 함
-  CATEGORY_MERGE_MAP: {
-    '비즈니스 분석': '비즈니스·데이터·금융분석',
-    '데이터': '비즈니스·데이터·금융분석',
-    '금융·재테크': '비즈니스·데이터·금융분석',
-  },
+  /* 보리 캐릭터 (일러스트) - 오른쪽 아래 고정 */
+  .pixel-mascot-wrap{
+    position:fixed;
+    right:14px; bottom:14px;
+    width:100px; height:100px;
+    z-index:40;
+    overflow:visible;
+  }
+  .char{
+    position:absolute; top:0; left:0;
+    width:100px; height:auto;
+  }
+  .char svg{ width:100%; height:auto; display:block; overflow:visible; }
+  .bounce{ animation:bounceBall 1.4s ease-in-out infinite; transform-origin:center bottom; }
+  @keyframes bounceBall{
+    0%,100%{ transform:translateY(0) scale(1,1); }
+    35%{ transform:translateY(-12px) scale(.97,1.05); }
+    55%{ transform:translateY(0) scale(1.08,.9); }
+    75%{ transform:translateY(0) scale(1,1); }
+  }
+  .dino-pop{ animation:dinoPopIn .45s cubic-bezier(.3,1.7,.6,1), bounceBall 1.4s ease-in-out 0.45s infinite; }
+  @keyframes dinoPopIn{
+    0%{ transform:scale(0) rotate(-10deg); opacity:0; }
+    60%{ transform:scale(1.15) rotate(6deg); opacity:1; }
+    100%{ transform:scale(1) rotate(0); opacity:1; }
+  }
+
+  .egg{ width:100px; transform-origin:center bottom; }
+  .egg svg{ width:100%; height:auto; display:block; overflow:visible; }
+  .egg-wiggle{ animation:eggWiggle .28s ease-in-out infinite; }
+  .egg-wiggle-slow{ animation:eggWiggleSlow 1.8s ease-in-out infinite; }
+  @keyframes eggWiggleSlow{
+    0%,100%{ transform:rotate(-3deg); }
+    50%{ transform:rotate(3deg); }
+  }
+  @keyframes eggWiggle{
+    0%,100%{ transform:rotate(-7deg); }
+    50%{ transform:rotate(7deg); }
+  }
+  .egg-crack{ animation:eggPop .22s ease-in forwards !important; }
+  @keyframes eggPop{
+    0%{ transform:scale(1); opacity:1; }
+    100%{ transform:scale(1.35); opacity:0; }
+  }
+
+  .blink-eyes{ transform-box:fill-box; transform-origin:center; animation:eyeBlink 4.2s ease-in-out infinite; }
+  .dog-eyes{ animation-delay:0s; }
+  @keyframes eyeBlink{
+    0%,88%,100%{transform:scaleY(1);}
+    93%{transform:scaleY(.12);}
+  }
+  .heart{
+    position:absolute; top:10px; font-size:18px; pointer-events:none;
+    animation:heart-float 1.6s ease-out forwards;
+  }
+  @keyframes heart-float{
+    0%{transform:translateY(0) scale(.4); opacity:0;}
+    20%{opacity:1; transform:translateY(-6px) scale(1);}
+    100%{transform:translateY(-70px) scale(1.1); opacity:0;}
+  }
+
+  .bingo-popup-overlay{
+    position:fixed; inset:0; background:rgba(10,10,35,.5);
+    display:flex; align-items:center; justify-content:center;
+    z-index:90; opacity:0; pointer-events:none; transition:opacity .25s ease;
+  }
+  .bingo-popup-overlay.show{ opacity:1; }
+  .bingo-popup-card{
+    background:linear-gradient(180deg, #ffe870, var(--gold));
+    border:4px solid #8a5a00;
+    padding:28px 40px; border-radius:14px; text-align:center;
+    box-shadow:0 10px 0 #8a5a00, 0 20px 30px rgba(0,0,0,.35);
+    transform:scale(.4) rotate(-6deg); opacity:0;
+    transition:transform .35s cubic-bezier(.34,1.56,.64,1), opacity .25s ease;
+  }
+  .bingo-popup-overlay.show .bingo-popup-card{ transform:scale(1) rotate(0); opacity:1; }
+  .bingo-popup-title{
+    font-family:'Press Start 2P', monospace; font-size:22px; color:#fff; margin:0 0 8px;
+    text-shadow:2px 2px 0 #a83200, -2px 2px 0 #a83200, 2px -2px 0 #a83200, -2px -2px 0 #a83200;
+  }
+  .bingo-popup-sub{ font-size:13px; color:#5a3a00; font-weight:700; margin:0; }
+
+  /* 카테고리 선택 화면 */
+  .select-card{
+    background:#fff; border:3px solid #2a2a2a; border-radius:14px; padding:24px; max-width:420px; margin:0 auto;
+    box-shadow:0 8px 0 #1a1a1a;
+  }
+  .select-card label{ display:block; font-size:13px; color:var(--muted); font-weight:700; margin-bottom:8px; }
+  .select-card select, .select-card input{
+    width:100%; padding:12px; border-radius:10px; border:2px solid #e4e6f5;
+    background:#f7f8ff; color:var(--ink); font-size:15px; font-weight:700;
+    font-family:'Noto Sans KR', sans-serif; margin-bottom:16px;
+  }
+  .instruction{ text-align:center; color:rgba(255,255,255,.85); font-size:14px; margin:0 0 18px; }
+
+  .progress-wrap{ display:flex; align-items:center; gap:10px; margin-bottom:16px; }
+  .goal-note{
+    text-align:center; font-family:'Press Start 2P', monospace; font-size:12px;
+    color:#fff; margin:0 0 14px;
+    text-shadow:2px 2px 0 #a83200, -1px -1px 0 #a83200;
+  }
+  .progress-track{
+    flex:1; height:16px; border-radius:6px;
+    background:#2a2a2a; overflow:hidden;
+    border:2px solid #111;
+  }
+  .progress-fill{
+    height:100%;
+    background:repeating-linear-gradient(90deg, var(--gold) 0 10px, #ffe680 10px 20px);
+    transition:width .4s ease;
+  }
+  .progress-label{ font-family:'Press Start 2P', monospace; font-size:11px; color:#fff; white-space:nowrap; text-shadow:1px 1px 0 rgba(0,0,0,.3); }
+
+  .bingo-grid{
+    display:grid; grid-template-columns:repeat(3, 1fr); gap:10px;
+    margin-bottom:22px;
+  }
+  .cell{
+    background:linear-gradient(180deg, #ffd83d, var(--gold) 55%, #e8a800);
+    border:3px solid #8a5a00;
+    border-radius:8px; min-height:136px; padding:14px 10px 32px;
+    display:flex; align-items:center; justify-content:center;
+    text-align:center; font-size:15px; font-weight:900; line-height:1.4; color:#5a3a00;
+    cursor:pointer; position:relative; user-select:none;
+    box-shadow:0 6px 0 #8a5a00, inset 0 3px 0 rgba(255,255,255,.4);
+    transition:transform .1s ease, box-shadow .1s ease;
+  }
+  .cell::before{
+    content:"?"; position:absolute; top:2px; left:8px;
+    font-family:'Press Start 2P', monospace; font-size:14px; color:#fff8dc;
+    opacity:.55; text-shadow:1px 1px 0 rgba(0,0,0,.15);
+  }
+  .cell:hover{transform:translateY(-3px);}
+  .cell:active{transform:translateY(4px); box-shadow:0 2px 0 #8a5a00;}
+  .cell-text{ pointer-events:none; }
+  .cell-link{
+    position:absolute; bottom:6px; right:6px; z-index:2;
+    background:var(--mario-red); color:#fff; text-decoration:none;
+    font-size:10.5px; font-weight:700; padding:4px 8px; border-radius:999px;
+    border:2px solid #8a1a18;
+    box-shadow:0 2px 0 #8a1a18;
+    white-space:nowrap;
+  }
+  .cell-link:hover{ background:#c81f1c; }
+
+  .cell.done{
+    background:linear-gradient(180deg, #d9b98a, #b98d55);
+    border-color:#5a3a1a;
+    color:#4a3520;
+    box-shadow:0 6px 0 #5a3a1a, inset 0 3px 0 rgba(255,255,255,.2);
+  }
+  .cell.done::before{ content:""; }
+
+  .stamp{
+    position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+    pointer-events:none; z-index:3;
+  }
+  .stamp-text{
+    font-family:'Noto Sans KR', sans-serif; font-weight:900; font-size:15px; letter-spacing:1px;
+    color:#b8231f; background:rgba(255,255,255,.3);
+    border:3px double #b8231f; border-radius:8px;
+    padding:6px 10px;
+    transform:rotate(-16deg);
+    mix-blend-mode:multiply;
+    animation:stamp-down .4s cubic-bezier(.3,1.7,.6,1);
+    white-space:nowrap;
+  }
+  @keyframes stamp-down{
+    0%{ transform:rotate(-16deg) scale(2.4); opacity:0; }
+    55%{ transform:rotate(-16deg) scale(.88); opacity:1; }
+    100%{ transform:rotate(-16deg) scale(1); opacity:1; }
+  }
+
+  .cell.line-complete{
+    box-shadow:0 0 0 3px #fff, 0 0 0 6px var(--mario-red), 0 6px 0 #5a3a1a;
+  }
+
+  .particle{
+    position:fixed; top:50%; left:50%; width:7px; height:7px; border-radius:50%;
+    pointer-events:none; opacity:1; z-index:60;
+  }
+
+  .actions{display:flex; justify-content:center;}
+  .btn-cute{
+    font-family:'Press Start 2P', monospace; font-weight:400; font-size:11px; cursor:pointer; color:#fff;
+    background:linear-gradient(180deg, #ff5f5b, var(--mario-red));
+    border:3px solid #8a1a18; padding:12px 20px; border-radius:8px;
+    box-shadow:0 6px 0 #8a1a18;
+    letter-spacing:.5px;
+  }
+  .btn-cute:hover{transform:translateY(-1px);}
+  .btn-cute:active{transform:translateY(5px); box-shadow:0 1px 0 #8a1a18;}
+  .hidden{display:none !important;}
+
+  .confetti-bit{
+    position:fixed; top:-20px; width:9px; height:9px; z-index:50; pointer-events:none;
+    animation:fall linear forwards;
+  }
+  @keyframes fall{ 0%{transform:translateY(0) rotate(0);} 100%{transform:translateY(110vh) rotate(540deg);} }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="header">
+    <h1 class="title">아카비와 함께하는 빙고게임~!</h1>
+    <button class="how-to-btn" id="howToBtn">🎮 게임 방법 보기</button>
+  </div>
+
+  <!-- 카테고리 선택 화면 -->
+  <div class="select-card" id="selectScreen">
+    <label>이름</label>
+    <input type="text" id="nameInput" placeholder="예: 홍길동">
+    <label>전화번호 뒷자리 4자리</label>
+    <input type="text" id="phoneInput" placeholder="예: 1234" maxlength="4" inputmode="numeric">
+    <label>어떤 카테고리로 빙고를 시작할까요?</label>
+    <select id="categorySelect"></select>
+    <button class="btn-cute" id="startBtn" style="width:100%;">빙고판 만들기</button>
+    <p id="selectError" style="color:#c0392b; font-size:12px; font-weight:700; text-align:center; margin:10px 0 0; display:none;"></p>
+  </div>
+
+  <!-- 빙고 보드 화면 -->
+  <div id="boardScreen" class="hidden">
+    <p class="goal-note">🎯 2빙고를 만들어주세요!</p>
+    <div class="progress-wrap">
+      <div class="progress-track"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+      <span class="progress-label" id="progressLabel">0/9</span>
+    </div>
+
+    <div class="bingo-grid" id="bingoGrid"></div>
+
+    <div class="actions">
+      <button class="btn-cute" id="resetBtn">다른 카테고리로 다시 뽑기</button>
+    </div>
+  </div>
+
+  <div class="pixel-mascot-wrap" id="mascotWrap">
+    <div class="char dog-char" id="pixelDog"></div>
+  </div>
+</div>
+
+<div class="bingo-popup-overlay" id="bingoPopup">
+  <div class="bingo-popup-card">
+    <p class="bingo-popup-title" id="bingoPopupTitle">1빙고!</p>
+    <p class="bingo-popup-sub">보리와 나비가 신났어요</p>
+  </div>
+</div>
+
+<div class="modal-overlay" id="howToModal">
+  <div class="modal-card">
+    <h2 class="modal-title">게임 참여 방법</h2>
+    <ol class="howto-list">
+      <li><span class="step-num">1</span>내 빙고판을 뽑아주세요</li>
+      <li><span class="step-num">2</span>빙고판에 있는 강의를 수강해주세요</li>
+      <li><span class="step-num">3</span>해당 강의를 3시간 이상 수강했다면 빙고판을 눌러주세요</li>
+      <li><span class="step-num">4</span>빙고 2줄을 만들면 캡쳐 후 인증해주세요</li>
+    </ol>
+    <button class="btn-cute" id="closeHowTo" style="width:100%;">확인!</button>
+  </div>
+</div>
+
+<script>
+/* ============ 강의 목록: 구글시트에서 실시간으로 불러옵니다 ============ */
+let COURSE_DATA = {}; // { 카테고리: [{title,url}, ...] } — loadCourseList()가 채움
+
+/* =================================================== */
+
+const CELL_COUNT = 9;
+const PARTICLE_COLORS = ["#e52521", "#fbd000", "#43b047", "#049cd8"];
+const ACCENT_CYCLE = ["#e52521", "#fbd000", "#43b047"];
+
+const els = {
+  categorySelect: document.getElementById('categorySelect'),
+  nameInput: document.getElementById('nameInput'),
+  phoneInput: document.getElementById('phoneInput'),
+  selectError: document.getElementById('selectError'),
+  startBtn: document.getElementById('startBtn'),
+  selectScreen: document.getElementById('selectScreen'),
+  boardScreen: document.getElementById('boardScreen'),
+  bingoGrid: document.getElementById('bingoGrid'),
+  progressFill: document.getElementById('progressFill'),
+  progressLabel: document.getElementById('progressLabel'),
+  resetBtn: document.getElementById('resetBtn'),
+  pixelDog: document.getElementById('pixelDog'),
+  mascotWrap: document.getElementById('mascotWrap'),
+  bingoPopup: document.getElementById('bingoPopup'),
+  bingoPopupTitle: document.getElementById('bingoPopupTitle'),
+  howToBtn: document.getElementById('howToBtn'),
+  howToModal: document.getElementById('howToModal'),
+  closeHowTo: document.getElementById('closeHowTo'),
 };
 
-function getOrCreateSheet_() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  let sheet = ss.getSheetByName(CONFIG.DATA_SHEET_NAME);
-  if (!sheet) {
-    sheet = ss.insertSheet(CONFIG.DATA_SHEET_NAME);
-    sheet.appendRow(['키', '이름', '전화번호뒷자리', '카테고리', '배정강의(JSON)', '클릭상태(JSON)', '생성시각', '수정시각']);
+els.howToBtn.addEventListener('click', () => els.howToModal.classList.add('show'));
+els.closeHowTo.addEventListener('click', () => els.howToModal.classList.remove('show'));
+els.howToModal.addEventListener('click', (e) => {
+  if (e.target === els.howToModal) els.howToModal.classList.remove('show');
+});
+
+const LINES = [
+  [0,1,2],[3,4,5],[6,7,8],
+  [0,3,6],[1,4,7],[2,5,8],
+  [0,4,8],[2,4,6],
+];
+
+/* ============ 설정: 배포 후 이 값만 바꾸면 됩니다 ============ */
+const API_CONFIG = {
+  // Apps Script 웹앱 배포 후 나오는 URL로 교체하세요 (…/exec 로 끝나는 링크)
+  API_URL: "https://script.google.com/macros/s/AKfycbygFueKlng5DMdNMb1sn3pGjzXmpHPH8bTfCiDBXCnZX1cE5Fakr0y9s5HOVu4LnyZqRA/exec",
+};
+/* ================================================================ */
+
+let boardData = null;
+let currentCategory = null;
+let currentUser = null; // { name, phone }
+
+function shuffle(arr) {
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
   }
-  return sheet;
+  return a;
 }
-
-function letterToIndex_(letter) {
-  let idx = 0;
-  for (let i = 0; i < letter.length; i++) {
-    idx = idx * 26 + (letter.toUpperCase().charCodeAt(i) - 64);
+function createNewBoard(category) {
+  const list = COURSE_DATA[category] || [];
+  if (list.length < CELL_COUNT) {
+    console.warn(`"${category}" 카테고리에 강의가 ${CELL_COUNT}개 미만입니다 (${list.length}개). 9칸을 채울 수 없어요.`);
   }
-  return idx - 1;
+  return { categories: shuffle(list).slice(0, CELL_COUNT), states: new Array(Math.min(CELL_COUNT, list.length)).fill(false) };
 }
 
-// "미수강 컨텐츠" 구글시트를 열어서 { 카테고리: [{title,url}, ...] } 형태로 반환
-// - 상태가 "활성"인 행만 포함
-// - 차시(에피소드) 단위 그대로 사용 (과정명 원본 그대로)
-// - 강의 수가 적은 대분류는 CATEGORY_MERGE_MAP에 따라 다른 카테고리로 합침
-function getCourseListFromSheet_() {
-  const ss = SpreadsheetApp.openById(CONFIG.COURSE_LIST_SPREADSHEET_ID);
-  const sheet = ss.getSheetByName(CONFIG.COURSE_LIST_SHEET_NAME);
-  if (!sheet) return {};
+// 구글시트("강의목록" 탭)에서 카테고리별 강의 목록을 불러옴
+async function loadCourseList() {
+  const data = await apiCall({ action: 'getCourseList' });
+  COURSE_DATA = data.categories || {};
+}
 
-  const titleIdx = letterToIndex_(CONFIG.COURSE_LIST_COLUMNS.TITLE);
-  const statusIdx = letterToIndex_(CONFIG.COURSE_LIST_COLUMNS.STATUS);
-  const urlIdx = letterToIndex_(CONFIG.COURSE_LIST_COLUMNS.URL);
-  const majorIdx = letterToIndex_(CONFIG.COURSE_LIST_COLUMNS.MAJOR_CATEGORY);
+async function apiCall(params) {
+  const url = new URL(API_CONFIG.API_URL);
+  Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
+  const res = await fetch(url.toString());
+  if (!res.ok) throw new Error('네트워크 오류: ' + res.status);
+  const data = await res.json();
+  if (data.error) throw new Error(data.error);
+  return data;
+}
 
-  const data = sheet.getDataRange().getValues();
-  const result = {};
-  for (let i = 1; i < data.length; i++) { // 1행은 헤더로 간주하고 건너뜀
-    const status = (data[i][statusIdx] || '').toString().trim();
-    if (status !== CONFIG.COURSE_LIST_ACTIVE_VALUE) continue;
-
-    const title = (data[i][titleIdx] || '').toString().trim();
-    const url = (data[i][urlIdx] || '').toString().trim();
-    let category = (data[i][majorIdx] || '').toString().trim();
-    if (!title || !category) continue;
-
-    category = CONFIG.CATEGORY_MERGE_MAP[category] || category;
-
-    if (!result[category]) result[category] = [];
-    result[category].push({ title, url });
+// 서버에서 이 사람 + 카테고리의 저장된 판을 가져옴 (없으면 null)
+async function loadBoardRemote(category) {
+  const data = await apiCall({
+    action: 'getBoard',
+    name: currentUser.name,
+    phone: currentUser.phone,
+    category,
+  });
+  if (data && data.categories) {
+    return { categories: data.categories, states: data.states };
   }
-  return result;
+  return null;
 }
 
-function normalize_(str) {
-  return (str || '').toString().trim().replace(/\s+/g, '');
+// 새로 만든 판을 서버에 저장
+async function saveBoardRemote() {
+  await apiCall({
+    action: 'saveBoard',
+    name: currentUser.name,
+    phone: currentUser.phone,
+    category: currentCategory,
+    categories: JSON.stringify(boardData.categories),
+    states: JSON.stringify(boardData.states),
+  });
 }
 
-function makeKey_(name, phone, category) {
-  return normalize_(name) + '_' + normalize_(phone) + '_' + normalize_(category);
+// 칸 하나의 상태만 서버에 반영
+async function setCellRemote(index, value) {
+  await apiCall({
+    action: 'setCell',
+    name: currentUser.name,
+    phone: currentUser.phone,
+    category: currentCategory,
+    index,
+    value: value ? '1' : '0',
+  });
 }
 
-function findRow_(sheet, key) {
-  const data = sheet.getDataRange().getValues();
-  for (let i = 1; i < data.length; i++) {
-    if (data[i][0] === key) return i + 1; // 실제 시트 행 번호(1-based)
-  }
-  return -1;
+function saveIdentityLocal(name, phone) {
+  try { localStorage.setItem('bingo_identity', JSON.stringify({ name, phone })); } catch (e) {}
 }
-
-function jsonResponse_(obj) {
-  return ContentService.createTextOutput(JSON.stringify(obj))
-    .setMimeType(ContentService.MimeType.JSON);
-}
-
-function doGet(e) {
+function loadIdentityLocal() {
   try {
-    const action = e.parameter.action;
+    const raw = localStorage.getItem('bingo_identity');
+    return raw ? JSON.parse(raw) : null;
+  } catch (e) { return null; }
+}
 
-    // 강의 목록 조회는 참여자 정보 없이도 호출 가능 (페이지 로드 시 바로 요청)
-    if (action === 'getCourseList') {
-      return jsonResponse_({ categories: getCourseListFromSheet_() });
-    }
+function getCompletedLines() {
+  return LINES.filter(line => line.every(i => boardData.states[i]));
+}
+function escapeHtml(str) {
+  return str.replace(/[&<>"']/g, s => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+  }[s]));
+}
 
-    const sheet = getOrCreateSheet_();
-    const name = e.parameter.name;
-    const phone = e.parameter.phone;
-    const category = e.parameter.category;
-
-    if (!name || !phone || !category) {
-      return jsonResponse_({ error: '이름, 전화번호, 카테고리가 모두 필요합니다.' });
-    }
-    const key = makeKey_(name, phone, category);
-
-    if (action === 'getBoard') {
-      const rowNum = findRow_(sheet, key);
-      if (rowNum > 0) {
-        const row = sheet.getRange(rowNum, 1, 1, 8).getValues()[0];
-        return jsonResponse_({
-          categories: JSON.parse(row[4]),
-          states: JSON.parse(row[5]),
-        });
-      }
-      return jsonResponse_({ categories: null, states: null });
-    }
-
-    if (action === 'saveBoard') {
-      const categories = e.parameter.categories; // JSON 문자열 그대로 저장
-      const states = e.parameter.states;
-      const now = new Date();
-      const rowNum = findRow_(sheet, key);
-      if (rowNum > 0) {
-        sheet.getRange(rowNum, 5).setValue(categories);
-        sheet.getRange(rowNum, 6).setValue(states);
-        sheet.getRange(rowNum, 8).setValue(now);
-      } else {
-        sheet.appendRow([key, name, phone, category, categories, states, now, now]);
-      }
-      return jsonResponse_({ ok: true });
-    }
-
-    if (action === 'setCell') {
-      const index = parseInt(e.parameter.index, 10);
-      const value = e.parameter.value === '1';
-      const rowNum = findRow_(sheet, key);
-      if (rowNum < 0) return jsonResponse_({ error: '해당 참여자의 빙고판을 찾을 수 없습니다. getBoard/saveBoard를 먼저 호출하세요.' });
-
-      const statesCell = sheet.getRange(rowNum, 6);
-      const states = JSON.parse(statesCell.getValue());
-      if (index < 0 || index >= states.length) return jsonResponse_({ error: '잘못된 칸 번호입니다.' });
-
-      states[index] = value;
-      statesCell.setValue(JSON.stringify(states));
-      sheet.getRange(rowNum, 8).setValue(new Date());
-
-      return jsonResponse_({ ok: true, states: states });
-    }
-
-    return jsonResponse_({ error: '알 수 없는 action 입니다.' });
-  } catch (err) {
-    return jsonResponse_({ error: err.toString() });
+function spawnParticles(cellEl) {
+  const rect = cellEl.getBoundingClientRect();
+  for (let i = 0; i < 8; i++) {
+    const p = document.createElement('div');
+    p.className = 'particle';
+    p.style.background = PARTICLE_COLORS[Math.floor(Math.random() * PARTICLE_COLORS.length)];
+    p.style.left = (rect.left + rect.width / 2) + 'px';
+    p.style.top = (rect.top + rect.height / 2) + 'px';
+    document.body.appendChild(p);
+    const angle = Math.random() * Math.PI * 2;
+    const dist = 35 + Math.random() * 35;
+    const dx = Math.cos(angle) * dist;
+    const dy = Math.sin(angle) * dist;
+    p.animate([
+      { transform: 'translate(0,0) scale(1)', opacity: 1 },
+      { transform: `translate(${dx}px, ${dy}px) scale(0)`, opacity: 0 }
+    ], { duration: 480, easing: 'ease-out' });
+    setTimeout(() => p.remove(), 500);
   }
 }
+function spawnConfetti() {
+  for (let i = 0; i < 32; i++) {
+    const bit = document.createElement('div');
+    bit.className = 'confetti-bit';
+    bit.style.left = Math.random() * 100 + 'vw';
+    bit.style.background = PARTICLE_COLORS[Math.floor(Math.random() * PARTICLE_COLORS.length)];
+    bit.style.animationDuration = (2 + Math.random() * 1.5) + 's';
+    bit.style.borderRadius = Math.random() > .5 ? '50%' : '2px';
+    document.body.appendChild(bit);
+    setTimeout(() => bit.remove(), 3600);
+  }
+}
+
+function render(justCompletedNewLine) {
+  const completedLines = getCompletedLines();
+  const completedCellSet = new Set(completedLines.flat());
+
+  els.bingoGrid.innerHTML = boardData.categories.map((course, i) => {
+    const label = course.title;
+    const url = course.url || '';
+    const done = boardData.states[i];
+    const inLine = completedCellSet.has(i);
+    const accent = ACCENT_CYCLE[i % ACCENT_CYCLE.length];
+    const linkBtn = url
+      ? `<a class="cell-link" href="${url}" target="_blank" rel="noopener" onclick="event.stopPropagation()">강의보러가기 →</a>`
+      : '';
+    const stamp = done ? `<div class="stamp"><span class="stamp-text">수강완료</span></div>` : '';
+    return `
+      <div class="cell ${done ? 'done' : ''} ${inLine ? 'line-complete' : ''}" style="--cellAccent:${accent}" data-index="${i}">
+        ${linkBtn}
+        <span class="cell-text">${escapeHtml(label)}</span>
+        ${stamp}
+      </div>`;
+  }).join('');
+
+  els.bingoGrid.querySelectorAll('.cell').forEach(cellEl => {
+    cellEl.addEventListener('click', () => toggleCell(parseInt(cellEl.dataset.index, 10), cellEl));
+  });
+
+  const doneCount = boardData.states.filter(Boolean).length;
+  const total = boardData.states.length;
+  els.progressFill.style.width = Math.round((doneCount / total) * 100) + '%';
+  els.progressLabel.textContent = `${doneCount}/${total}`;
+
+  updateMascotStage(completedLines.length);
+
+  if (justCompletedNewLine) {
+    showBingoPopup(completedLines.length);
+    spawnConfetti();
+  }
+}
+
+function showBingoPopup(count) {
+  els.bingoPopupTitle.textContent = `${count}빙고!`;
+  els.bingoPopup.classList.add('show');
+  clearTimeout(showBingoPopup._t);
+  showBingoPopup._t = setTimeout(() => {
+    els.bingoPopup.classList.remove('show');
+  }, 1600);
+}
+
+function spawnHeart() {
+  if (!els.mascotWrap) return;
+  const heart = document.createElement('div');
+  heart.className = 'heart';
+  heart.textContent = '💗';
+  heart.style.left = (40 + Math.random() * 20) + '%';
+  els.mascotWrap.appendChild(heart);
+  setTimeout(() => heart.remove(), 1700);
+}
+setInterval(spawnHeart, 2200);
+
+function toggleCell(index, cellEl) {
+  const wasComplete = getCompletedLines().length;
+  const newValue = !boardData.states[index];
+  boardData.states[index] = newValue; // 낙관적 업데이트
+  if (newValue) spawnParticles(cellEl);
+  const nowComplete = getCompletedLines().length;
+  render(nowComplete > wasComplete);
+
+  setCellRemote(index, newValue).catch(err => {
+    console.error(err);
+    // 실패 시 되돌리기
+    boardData.states[index] = !newValue;
+    render(false);
+    alert('저장에 실패했어요. 인터넷 연결을 확인하고 다시 시도해주세요.');
+  });
+}
+
+async function startBoard(category) {
+  const name = els.nameInput.value.trim();
+  const phone = els.phoneInput.value.trim();
+  if (!name || phone.length !== 4) {
+    els.selectError.textContent = '이름과 전화번호 뒷자리 4자리를 정확히 입력해주세요.';
+    els.selectError.style.display = 'block';
+    return;
+  }
+  els.selectError.style.display = 'none';
+  currentUser = { name, phone };
+  currentCategory = category;
+  saveIdentityLocal(name, phone);
+
+  els.startBtn.disabled = true;
+  els.startBtn.textContent = '불러오는 중...';
+
+  try {
+    const remote = await loadBoardRemote(category);
+    if (remote) {
+      boardData = remote;
+    } else {
+      boardData = createNewBoard(category);
+      await saveBoardRemote();
+    }
+    els.selectScreen.classList.add('hidden');
+    els.boardScreen.classList.remove('hidden');
+    render(false);
+  } catch (err) {
+    console.error(err);
+    els.selectError.textContent = `데이터를 불러오지 못했어요: ${err.message || err}`;
+    els.selectError.style.display = 'block';
+  } finally {
+    els.startBtn.disabled = false;
+    els.startBtn.textContent = '빙고판 만들기';
+  }
+}
+
+// 보리 & 나비 캐릭터를 SVG로 그려서 삽입 (완전히 부화한 상태)
+function renderPixelDog() {
+  if (!els.pixelDog) return;
+  els.pixelDog.innerHTML = `
+    <div class="bounce dino-pop">
+    <svg viewBox="20 15 220 240" role="img" aria-label="공룡 캐릭터">
+      <defs>
+        <filter id="shadowDog"><feDropShadow dx="0" dy="5" stdDeviation="3" flood-opacity=".22"/></filter>
+        <radialGradient id="dinoBody" cx="35%" cy="22%" r="85%"><stop offset="0" stop-color="#c8f0a0"/><stop offset="55%" stop-color="#7ecb5e"/><stop offset="100%" stop-color="#4a9c34"/></radialGradient>
+        <radialGradient id="dinoSpike" cx="40%" cy="18%" r="85%"><stop offset="0" stop-color="#ffb37a"/><stop offset="100%" stop-color="#e5622a"/></radialGradient>
+        <radialGradient id="snoutGrad" cx="35%" cy="20%" r="90%"><stop offset="0" stop-color="#fdffe8"/><stop offset="100%" stop-color="#e4f0c0"/></radialGradient>
+      </defs>
+      <g filter="url(#shadowDog)">
+        <ellipse cx="130" cy="228" rx="58" ry="10" fill="#00000018"/>
+        <path d="M195 160q22-10 18 14-4 16-22 6Z" fill="url(#dinoBody)"/>
+        <path d="M82 88 Q96 44 110 88 Z" fill="url(#dinoSpike)"/>
+        <path d="M114 82 Q129 36 144 82 Z" fill="url(#dinoSpike)"/>
+        <path d="M148 88 Q162 44 176 88 Z" fill="url(#dinoSpike)"/>
+        <circle cx="128" cy="145" r="70" fill="url(#dinoBody)"/>
+        <ellipse cx="106" cy="112" rx="25" ry="14" fill="#ffffff" opacity=".35"/>
+        <path d="M96 168 Q96 196 128 200 Q168 202 172 172 Q174 150 150 148 Q100 146 96 168 Z" fill="url(#snoutGrad)"/>
+        <circle cx="121" cy="176" r="3" fill="#2b4020"/><circle cx="150" cy="176" r="3" fill="#2b4020"/>
+        <path d="M112 190q16 10 32 1" fill="none" stroke="#4a3520" stroke-width="3" stroke-linecap="round"/>
+        <g class="blink-eyes dog-eyes">
+          <ellipse cx="106" cy="130" rx="10" ry="13" fill="#2b2140"/><ellipse cx="150" cy="128" rx="10" ry="13" fill="#2b2140"/>
+          <circle cx="102" cy="124" r="3.2" fill="#fff"/><circle cx="146" cy="122" r="3.2" fill="#fff"/>
+        </g>
+        <ellipse cx="86" cy="150" rx="9" ry="6" fill="#ff9fb0" opacity=".55"/>
+      </g>
+    </svg>
+    </div>`;
+}
+
+// 알 SVG (stage: 'egg' = 매끈한 알, 'cracked' = 금 간 알 + 눈 살짝 보임)
+function eggMarkup(stage) {
+  const crackBits = stage === 'cracked' ? `
+        <path d="M92 88 L112 118 L94 138 L116 163" fill="none" stroke="#c9a15a" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+        <ellipse cx="128" cy="128" rx="15" ry="10" fill="#4a9c34"/>
+        <circle cx="128" cy="126" r="4.2" fill="#16240f"/>
+        <circle cx="126" cy="124" r="1.2" fill="#fff"/>
+  ` : '';
+  return `
+    <div class="egg ${stage === 'cracked' ? 'egg-wiggle' : 'egg-wiggle-slow'}">
+    <svg viewBox="20 15 220 240" role="img" aria-label="${stage === 'cracked' ? '금이 간 알' : '알'}">
+      <defs>
+        <filter id="shadowEgg"><feDropShadow dx="0" dy="5" stdDeviation="3" flood-opacity=".22"/></filter>
+        <radialGradient id="eggGrad" cx="35%" cy="20%" r="85%"><stop offset="0" stop-color="#fffdf6"/><stop offset="60%" stop-color="#fff1d6"/><stop offset="100%" stop-color="#eed9ae"/></radialGradient>
+      </defs>
+      <g filter="url(#shadowEgg)">
+        <ellipse cx="130" cy="222" rx="52" ry="9" fill="#00000018"/>
+        <path d="M130 30 C80 30 48 100 48 150 C48 195 82 225 130 225 C178 225 212 195 212 150 C212 100 180 30 130 30 Z" fill="url(#eggGrad)"/>
+        <ellipse cx="105" cy="85" rx="22" ry="13" fill="#ffffff" opacity=".4"/>
+        <ellipse cx="95" cy="150" rx="9" ry="7" fill="#d8b878" opacity=".7"/>
+        <ellipse cx="165" cy="130" rx="7" ry="6" fill="#d8b878" opacity=".7"/>
+        <ellipse cx="150" cy="185" rx="8" ry="6" fill="#d8b878" opacity=".6"/>
+        <ellipse cx="100" cy="190" rx="6" ry="5" fill="#d8b878" opacity=".6"/>
+        ${crackBits}
+      </g>
+    </svg>
+    </div>`;
+}
+
+let mascotStage = null; // 'egg' | 'cracked' | 'hatched'
+
+function renderEggStage(stage) {
+  if (!els.pixelDog) return;
+  els.pixelDog.innerHTML = eggMarkup(stage);
+}
+
+// 완성한 줄 수에 따라 알 → 금간 알 → 부화 단계를 갱신
+// 0줄: 알 / 1줄: 금이 감 / 2줄 이상: 완전히 부화
+function updateMascotStage(lineCount) {
+  const stage = lineCount === 0 ? 'egg' : (lineCount === 1 ? 'cracked' : 'hatched');
+  if (stage === mascotStage) return;
+  mascotStage = stage;
+  if (stage === 'hatched') {
+    playHatch();
+  } else {
+    renderEggStage(stage);
+  }
+}
+
+function playHatch() {
+  if (!els.pixelDog) return;
+  els.pixelDog.innerHTML = eggMarkup('cracked');
+  setTimeout(() => {
+    const eggEl = els.pixelDog.querySelector('.egg');
+    if (eggEl) eggEl.classList.add('egg-crack');
+    setTimeout(() => {
+      renderPixelDog();
+    }, 220);
+  }, 650);
+}
+
+// 처음엔 알 상태로 시작
+renderEggStage('egg');
+mascotStage = 'egg';
+
+// 페이지 로드 시 구글시트("강의목록" 탭)에서 카테고리·강의 목록을 불러와 드롭다운을 채움
+(async function initCourseList() {
+  els.startBtn.disabled = true;
+  els.startBtn.textContent = '강의 목록 불러오는 중...';
+  try {
+    await loadCourseList();
+    const categories = Object.keys(COURSE_DATA);
+    if (categories.length === 0) {
+      els.selectError.textContent = '강의목록 시트에 데이터가 없어요. 구글시트에 "강의목록" 탭(카테고리|강의명|URL)을 확인해주세요.';
+      els.selectError.style.display = 'block';
+    }
+    categories.forEach(category => {
+      const opt = document.createElement('option');
+      opt.value = category;
+      opt.textContent = category;
+      els.categorySelect.appendChild(opt);
+    });
+  } catch (err) {
+    console.error(err);
+    els.selectError.textContent = `강의 목록을 불러오지 못했어요: ${err.message || err}`;
+    els.selectError.style.display = 'block';
+  } finally {
+    els.startBtn.disabled = false;
+    els.startBtn.textContent = '빙고판 만들기';
+  }
+})();
+
+// 이전에 입력했던 이름/전화번호 자동 채우기
+(function fillSavedIdentity() {
+  const saved = loadIdentityLocal();
+  if (saved) {
+    els.nameInput.value = saved.name || '';
+    els.phoneInput.value = saved.phone || '';
+  }
+})();
+
+els.startBtn.addEventListener('click', () => {
+  startBoard(els.categorySelect.value);
+});
+
+els.resetBtn.addEventListener('click', () => {
+  els.boardScreen.classList.add('hidden');
+  els.selectScreen.classList.remove('hidden');
+});
+</script>
+</body>
+</html>
